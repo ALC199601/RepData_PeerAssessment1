@@ -1,25 +1,109 @@
 ---
 title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+output: html_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
 ## Loading and preprocessing the data
 
-
+```{r}
+if(!file.exists("getdata-projectfiles-UCI HAR Dataset.zip")) {
+  download <- tempfile()
+  download.file("http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip",download)
+  unzip(download)
+  unlink(download)
+}
+```
 
 ## What is mean total number of steps taken per day?
 
+```{r}
+raw_data <- read.csv("activity.csv")
+steps_day <-  aggregate(steps ~ date, raw_data, sum)
+hist(steps_day$steps, main = "Steps per Day", xlab = "Steps", 
+     ylab = "Frequency", ylim = c(0,40), col = "yellow")
+```
 
+### What are mean and median steps per day?
+```{r}
+step_mean <- mean(steps_day$steps)
+step_med <-median(steps_day$steps)
+cat("The mean number of steps per day is ", step_mean,".")
+cat("The median number of steps per day is", step_med,".")
+```
 
 ## What is the average daily activity pattern?
+```{r}
+interval_steps <- aggregate(steps ~ interval, raw_data, mean)
 
+plot(interval_steps$interval, interval_steps$steps, type = "l", 
+     col = "red", main = "Mean Steps per Interval", 
+     xlab = "Interval", ylab = "Mean Steps", ylim = c(0,225))
+```
 
+###Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+```{r}
+max_interval <- which.max(interval_steps$steps)
+max_index <-interval_steps[max_interval, ]
+max_index <- c(max_index[1], max_index[2])
+cat("The interval which contains the maximum number of steps and the number of steps is", ":")
+max_index
+```
 
 ## Imputing missing values
+### Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+```{r}
+nrow(raw_data[is.na(raw_data$steps),])
+```
+## New Dataset replacing NAs with the mean per time period
+```{r}
+missing <- raw_data
+for (i in 1:nrow(missing)){
+  if (is.na(missing$steps[i])){
+    missing$steps[i] <- interval_steps$steps[which(missing$interval[i]== interval_steps$interval)]
+  }
+}
+```
+## Histogram of new data with mean and median reported
+```{r}
+steps_day_missing <-  aggregate(steps ~ date, missing, sum)
+hist(steps_day_missing$steps, main = "Steps per Day w/o Missing Data", 
+     xlab = "Steps", ylab = "Frequency", ylim = c(0,40), col = "purple")
+step_mean_missing <- mean(steps_day_missing$steps)
+step_med_missing <-median(steps_day_missing$steps)
+cat("The mean and median with values replaced are ", step_mean_missing, "and", 
+    step_med_missing)
+cat("Without replacing missing data, the mean and median daily steps were", step_mean, "and", step_med)
+```
+### The impact of replacing missing values with the corresponding interval mean is negligible.
+
+## Weekend versus Weekday Activity
+```{r}
+missing$weekday <- weekdays(as.Date(missing$date, abbreviate = FALSE))
+
+missing$whatday <- ifelse(missing$weekday == "Saturday" | 
+        missing$weekday == "Sunday", "Weekend", "Weekday")
+
+weekend <- subset(missing, missing$whatday == "Weekend", 
+  select = c("steps", "date", "interval", "whatday"))
+
+weekday <- subset(missing, missing$whatday == "Weekday", 
+                  select = c("steps", "date", "interval", "whatday"))
+
+weekend_steps <- aggregate(steps ~ interval, weekend, mean)
+weekday_steps <- aggregate(steps ~ interval, weekday, mean)
 
 
+par(mfcol = c(2,1), "mar" = c(3,2,2,1))
 
-## Are there differences in activity patterns between weekdays and weekends?
+plot(weekend_steps$interval, weekend_steps$steps, type = "l", 
+     col = "red", main = "Weekend Steps per Interval", 
+     xlab = "Interval", ylab = "Mean Steps", ylim = c(0,225))
+
+plot(weekday_steps$interval, weekday_steps$steps, type = "l", 
+     col = "red", main = "Weekday Steps per Interval", 
+     xlab = "Interval", ylab = "Mean Steps", ylim = c(0,225))
+```
